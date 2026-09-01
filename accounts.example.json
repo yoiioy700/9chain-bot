@@ -13,9 +13,8 @@
   },
   "accounts": [
     {
-      "name": "Account 1",
-      "email": "your_email_here@example.com",
-      "password": "your_password_here",
+      "name": "Akun Utama",
+      "token": "PASTE_ACCESS_TOKEN_ANDA_DI_SINI",
       "proxy": ""
     }
   ]

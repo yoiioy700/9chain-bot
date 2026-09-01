@@ -1,10 +1,11 @@
 import os
 import json
 import time
+import uuid
 import random
 import requests
 
-BASE_URL = "https://www.9chain.com"
+API_BASE = "https://api.9chain.com/v2"
 
 PRAYER_MESSAGES = [
     "Wishing good health and peace for everyone in 9Chain.",
@@ -17,9 +18,9 @@ PRAYER_MESSAGES = [
 class NineChainBot:
     def __init__(self, account_config):
         self.name = account_config.get("name", "Unknown Account")
-        self.email = account_config.get("email")
-        self.password = account_config.get("password")
-        self.proxy = account_config.get("proxy", "")
+        self.token = account_config.get("token", "").strip()
+        self.proxy = account_config.get("proxy", "").strip()
+        self.device_id = str(uuid.uuid4())
         
         self.session = requests.Session()
         if self.proxy:
@@ -28,92 +29,110 @@ class NineChainBot:
         self.session.headers.update({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
             "Accept": "application/json, text/plain, */*",
-            "Origin": BASE_URL,
-            "Referer": f"{BASE_URL}/virtual-node"
+            "Content-Type": "application/json",
+            "Origin": "https://www.9chain.com",
+            "Referer": "https://www.9chain.com/",
+            "x-device-id": self.device_id
         })
+
+        if self.token and not self.token.startswith("PASTE_"):
+            self.session.headers["Authorization"] = f"Bearer {self.token}"
 
         self.stats = {
             "name": self.name,
             "status": "Failed",
-            "daily_gift": "Skipped",
+            "xp_total": "0",
             "taps_done": 0,
+            "quests_claimed": 0,
             "upgrades": [],
-            "prayed": False,
-            "points": "N/A"
+            "prayed": False
         }
 
-    def login(self):
-        print(f"[{self.name}] 🔑 Melakukan login ({self.email})...")
-        try:
-            res = self.session.post(f"{BASE_URL}/api/auth/login", json={
-                "email": self.email,
-                "password": self.password
-            }, timeout=20)
-
-            if res.status_code in [200, 201]:
-                print(f"[{self.name}] ✓ Login Berhasil!")
-                self.stats["status"] = "Success"
-                return True
-            else:
-                print(f"[{self.name}] ✗ Gagal login: HTTP {res.status_code} - {res.text}")
-                return False
-        except Exception as e:
-            print(f"[{self.name}] ✗ Error koneksi login: {e}")
+    def verify_auth(self):
+        if not self.token or self.token.startswith("PASTE_"):
+            print(f"[{self.name}] ✗ Token belum diisi! Silakan isi token di accounts.json.")
             return False
 
-    def claim_daily(self):
-        print(f"[{self.name}] 🎁 Mengecek Daily Gift...")
+        print(f"[{self.name}] 🔑 Memeriksa status koneksi akun...")
         try:
-            res = self.session.post(f"{BASE_URL}/api/node/daily-gift", timeout=15)
+            res = self.session.get(f"{API_BASE}/program/state", timeout=15)
             if res.status_code == 200:
-                print(f"[{self.name}] ✓ Daily Gift berhasil diklaim!")
-                self.stats["daily_gift"] = "Claimed ✓"
+                data = res.json().get("data", {})
+                self.stats["status"] = "Success"
+                self.stats["xp_total"] = str(data.get("xpTotal", 0))
+                print(f"[{self.name}] ✓ Akun Aktif | Total Poin (XP): {self.stats['xp_total']}")
+                return True
+            elif res.status_code == 401:
+                print(f"[{self.name}] ✗ Token Expired / Tidak Valid (HTTP 401). Silakan perbarui token.")
+                return False
             else:
-                msg = res.json().get('message', 'Sudah diklaim / Belum tersedia') if 'application/json' in res.headers.get('content-type', '') else 'Already Claimed'
-                print(f"[{self.name}] - Daily Gift: {msg}")
-                self.stats["daily_gift"] = "Already Claimed"
+                err_msg = res.json().get("error", {}).get("message", f"HTTP {res.status_code}") if "application/json" in res.headers.get("content-type", "") else f"HTTP {res.status_code}"
+                print(f"[{self.name}] ✗ Gagal connect: {err_msg}")
+                return False
         except Exception as e:
-            print(f"[{self.name}] - Gagal claim Daily Gift: {e}")
-            self.stats["daily_gift"] = "Error"
+            print(f"[{self.name}] ✗ Error koneksi ke server: {e}")
+            return False
+
+    def enter_program_if_needed(self):
+        try:
+            self.session.post(f"{API_BASE}/program/enter", timeout=15)
+        except Exception:
+            pass
+
+    def claim_quests(self):
+        print(f"[{self.name}] 🎁 Mengecek Quests & Hadiah Harian...")
+        try:
+            res = self.session.get(f"{API_BASE}/program/quests", timeout=15)
+            if res.status_code == 200:
+                quests = res.json().get("data", {}).get("quests", [])
+                claimed = 0
+                for q in quests:
+                    q_key = q.get("key") or q.get("id")
+                    if q.get("canClaim") and q_key:
+                        claim_res = self.session.post(f"{API_BASE}/program/quests/claim", json={"questKey": q_key}, timeout=15)
+                        if claim_res.status_code == 200:
+                            claimed += 1
+                            print(f"[{self.name}] ✓ Berhasil klaim quest: {q.get('title', q_key)}")
+                
+                self.stats["quests_claimed"] = claimed
+                if claimed == 0:
+                    print(f"[{self.name}] - Tidak ada quest baru yang siap diklaim saat ini.")
+            else:
+                print(f"[{self.name}] - Status Quests: HTTP {res.status_code}")
+        except Exception as e:
+            print(f"[{self.name}] - Error saat klaim quest: {e}")
 
     def push_taps(self, max_taps=1000):
-        print(f"[{self.name}] ⚡ Memulai auto-push ({max_taps} taps)...")
-        count = 0
-        for i in range(max_taps):
+        print(f"[{self.name}] ⚡ Menjalankan Auto-Push {max_taps} Taps...")
+        total_success = 0
+        batch_size = 100  # Kirim dalam batch agar efisien & cepat
+
+        while total_success < max_taps:
+            count_to_tap = min(batch_size, max_taps - total_success)
             try:
-                res = self.session.post(f"{BASE_URL}/api/node/push", timeout=10)
-                
-                # Auto Re-login jika sesi expired tiba-tiba
-                if res.status_code == 401:
-                    print(f"\n[{self.name}] Token expired. Melakukan relogin...")
-                    if self.login():
-                        continue
-                    else:
-                        break
-
+                res = self.session.post(f"{API_BASE}/program/tap", json={"count": count_to_tap}, timeout=15)
                 if res.status_code == 200:
-                    count += 1
-                    if count % 100 == 0:
-                        print(f"[{self.name}] Progress: {count}/{max_taps} PUSH")
+                    total_success += count_to_tap
+                    print(f"[{self.name}] [+] Progress PUSH: {total_success}/{max_taps} Taps selesai")
+                    time.sleep(random.uniform(0.5, 1.2))
                 else:
-                    print(f"\n[{self.name}] - PUSH dihentikan: Kuota habis / Limit tercapai.")
+                    err_data = res.json() if "application/json" in res.headers.get("content-type", "") else {}
+                    err_msg = err_data.get("error", {}).get("message", f"Limit tercapai (HTTP {res.status_code})")
+                    print(f"[{self.name}] - Stop PUSH: {err_msg}")
                     break
-
-                # Jeda natural 80ms - 150ms
-                time.sleep(random.uniform(0.08, 0.15))
             except Exception as e:
-                print(f"[{self.name}] Error PUSH tap: {e}")
-                time.sleep(1)
+                print(f"[{self.name}] - Error saat tap batch: {e}")
+                break
 
-        self.stats["taps_done"] = count
-        print(f"[{self.name}] ✓ Selesai PUSH! Total {count} taps berhasil dikirim.")
+        self.stats["taps_done"] = total_success
+        print(f"[{self.name}] ✓ Selesai! Total {total_success} Taps berhasil diproses.")
 
     def auto_upgrade(self):
-        print(f"[{self.name}] 🛠️ Mengecek upgrade komponen Node (CPU & RAM)...")
+        print(f"[{self.name}] 🛠️ Mengecek Upgrade Hardware Node...")
         components = ["cpu", "ram"]
         for comp in components:
             try:
-                res = self.session.post(f"{BASE_URL}/api/node/upgrade", json={"component": comp}, timeout=15)
+                res = self.session.post(f"{API_BASE}/program/upgrade", json={"componentKey": comp}, timeout=15)
                 if res.status_code == 200:
                     print(f"[{self.name}] ✓ Upgrade {comp.upper()} Berhasil!")
                     self.stats["upgrades"].append(comp.upper())
@@ -124,21 +143,21 @@ class NineChainBot:
         print(f"[{self.name}] 🙏 Mengirim pesan doa komunitas...")
         try:
             msg = random.choice(PRAYER_MESSAGES)
-            res = self.session.post(f"{BASE_URL}/api/prayer/post", json={"room": "Together", "message": msg}, timeout=15)
+            res = self.session.post(f"{API_BASE}/prayer/post", json={"room": "Together", "message": msg}, timeout=15)
             if res.status_code in [200, 201]:
-                print(f"[{self.name}] ✓ Pesan doa berhasil dikirim!")
+                print(f"[{self.name}] ✓ Pesan doa terkirim ke room Together!")
                 self.stats["prayed"] = True
             else:
-                print(f"[{self.name}] - Prayer skipped / limit")
+                print(f"[{self.name}] - Prayer: limit / sudah terkirim.")
         except Exception as e:
             print(f"[{self.name}] - Error Prayer: {e}")
 
-    def fetch_stats(self):
+    def refresh_final_state(self):
         try:
-            res = self.session.get(f"{BASE_URL}/api/node/info", timeout=15)
+            res = self.session.get(f"{API_BASE}/program/state", timeout=15)
             if res.status_code == 200:
-                data = res.json()
-                self.stats["points"] = data.get("balance", data.get("total_points", "N/A"))
+                data = res.json().get("data", {})
+                self.stats["xp_total"] = str(data.get("xpTotal", self.stats["xp_total"]))
         except Exception:
             pass
 
@@ -162,8 +181,9 @@ def send_telegram_notification(tg_config, all_stats):
         pray_str = "✓" if s["prayed"] else "-"
         
         text += f"{status_icon} <b>{s['name']}</b>\n"
-        text += f"• Daily Gift: {s['daily_gift']}\n"
+        text += f"• Poin/XP Total: <b>{s['xp_total']}</b>\n"
         text += f"• PUSH Taps: {s['taps_done']} taps\n"
+        text += f"• Quest Claimed: {s['quests_claimed']}\n"
         text += f"• Upgrade: {upgrades_str}\n"
         text += f"• Pray Room: {pray_str}\n"
         text += "────────────────────────\n"
@@ -185,7 +205,7 @@ def main():
             import shutil
             shutil.copy(example_path, config_path)
             print(f"[!] File accounts.json otomatis dibuat dari accounts.example.json.")
-            print(f"[*] Silakan edit file accounts.json dan masukkan akun Anda:")
+            print(f"[*] Silakan edit file accounts.json dan masukkan Token akun Anda:")
             print("    nano accounts.json")
         else:
             print(f"✗ File {config_path} tidak ditemukan!")
@@ -209,12 +229,14 @@ def main():
         print(f"\n▶ [{idx}/{len(accounts)}] Memproses: {acc.get('name')}")
         bot = NineChainBot(acc)
 
-        if bot.login():
-            # 1. Daily Gift
-            if settings.get("auto_daily_gift", True):
-                bot.claim_daily()
+        if bot.verify_auth():
+            bot.enter_program_if_needed()
 
-            # 2. Auto Push 1000 Taps
+            # 1. Quests & Daily
+            if settings.get("auto_daily_gift", True):
+                bot.claim_quests()
+
+            # 2. Auto Push Taps
             if settings.get("auto_push_taps", True):
                 bot.push_taps(settings.get("max_taps", 1000))
 
@@ -226,17 +248,17 @@ def main():
             if settings.get("auto_pray", True):
                 bot.send_prayer()
 
-            bot.fetch_stats()
+            bot.refresh_final_state()
 
         summary_stats.append(bot.stats)
 
-        # Jeda natural antar akun (3-6 detik)
+        # Jeda natural antar akun
         if idx < len(accounts):
             pause = random.randint(3, 6)
-            print(f"[*] Menunggu {pause} detik sebelum pindah akun...")
+            print(f"[*] Menunggu {pause} detik sebelum akun berikutnya...")
             time.sleep(pause)
 
-    # Kirim Laporan ke Telegram jika diaktifkan
+    # Kirim Laporan Telegram
     send_telegram_notification(tg_config, summary_stats)
 
     print("\n" + "=" * 60)
