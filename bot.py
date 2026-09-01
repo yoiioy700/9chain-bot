@@ -36,7 +36,12 @@ class NineChainBot:
         })
 
         if self.token and not self.token.startswith("PASTE_"):
-            self.session.headers["Authorization"] = f"Bearer {self.token}"
+            if "=" in self.token or ";" in self.token:
+                # User memasukkan Cookie string
+                self.session.headers["Cookie"] = self.token
+            else:
+                # User memasukkan Bearer JWT token
+                self.session.headers["Authorization"] = f"Bearer {self.token}"
 
         self.stats = {
             "name": self.name,
