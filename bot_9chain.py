@@ -178,10 +178,18 @@ def send_telegram_notification(tg_config, all_stats):
 
 def main():
     config_path = os.path.join(os.path.dirname(__file__), "accounts.json")
+    example_path = os.path.join(os.path.dirname(__file__), "accounts.example.json")
+
     if not os.path.exists(config_path):
-        print(f"✗ File {config_path} tidak ditemukan!")
-        print("[*] Silakan salin accounts.example.json menjadi accounts.json lalu isi data akun Anda:")
-        print("    cp accounts.example.json accounts.json")
+        if os.path.exists(example_path):
+            import shutil
+            shutil.copy(example_path, config_path)
+            print(f"[!] File accounts.json otomatis dibuat dari accounts.example.json.")
+            print(f"[*] Silakan edit file accounts.json dan masukkan akun Anda:")
+            print("    nano accounts.json")
+        else:
+            print(f"✗ File {config_path} tidak ditemukan!")
+            print("[*] Silakan buat file accounts.json terlebih dahulu.")
         return
 
     with open(config_path, "r") as f:

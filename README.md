@@ -24,7 +24,14 @@ pip install -r requirements.txt
 ```
 
 ### 3. Konfigurasi Akun (`accounts.json`)
-Edit file `accounts.json` dan masukkan email serta password akun 9Chain Anda.
+Salin template konfigurasi:
+```bash
+cp accounts.example.json accounts.json
+```
+Lalu edit file `accounts.json` dan masukkan email serta password akun 9Chain Anda:
+```bash
+nano accounts.json
+```
 
 ### 4. Jalankan Bot
 ```bash
