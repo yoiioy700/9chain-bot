@@ -35,7 +35,7 @@ nano accounts.json
 
 ### 4. Jalankan Bot
 ```bash
-python bot_9chain.py
+python bot.py
 ```
 
 ### 5. Jadwalkan Otomatis (Cron Job VPS)
@@ -45,5 +45,5 @@ crontab -e
 ```
 Tambahkan baris berikut agar bot berjalan otomatis setiap hari jam 06:00 WIB:
 ```bash
-0 6 * * * /usr/bin/python3 /path/to/9chain-bot/bot_9chain.py >> /path/to/9chain-bot/bot.log 2>&1
+0 6 * * * /usr/bin/python3 /path/to/9chain-bot/bot.py >> /path/to/9chain-bot/bot.log 2>&1
 ```
