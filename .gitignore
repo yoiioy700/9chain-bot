@@ -1,0 +1,26 @@
+# Sensitive Credentials
+accounts.json
+.env
+*.env
+*.key
+*.pem
+
+# Sessions & Cache
+9chain_session/
+session*/
+*.session
+*.tmp
+
+# Logs
+*.log
+logs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+env/
+venv/

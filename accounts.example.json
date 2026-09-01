@@ -1,0 +1,22 @@
+{
+  "telegram": {
+    "enabled": false,
+    "bot_token": "YOUR_TELEGRAM_BOT_TOKEN",
+    "chat_id": "YOUR_TELEGRAM_CHAT_ID"
+  },
+  "settings": {
+    "auto_daily_gift": true,
+    "auto_push_taps": true,
+    "max_taps": 1000,
+    "auto_upgrade_node": true,
+    "auto_pray": true
+  },
+  "accounts": [
+    {
+      "name": "Account 1",
+      "email": "your_email_here@example.com",
+      "password": "your_password_here",
+      "proxy": ""
+    }
+  ]
+}
