@@ -13,8 +13,11 @@
     "tap_batch_size": 5,
     "tap_delay_min": 1.0,
     "tap_delay_max": 2.5,
-    "auto_upgrade_node": true,
-    "auto_claim_quests": true
+    "auto_upgrade_components": true,
+    "auto_upgrade_node_tier": true,
+    "auto_claim_quests": true,
+    "auto_pray": true,
+    "pray_room": "together"
   },
   "accounts": [
     {

@@ -32,11 +32,20 @@ BANNER = f"""{CYAN}{BOLD}
    ╚═══██║ ██║     ██╔══██║██╔══██║██║██║╚██╗██║
   ██████╔╝ ╚██████╗██║  ██║██║  ██║██║██║ ╚████║
   ╚═════╝   ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝
-{RESET}{DIM}  9Chain Virtual Node 24/7 Automation Bot | v2.0
+{RESET}{DIM}  9Chain Virtual Node 24/7 Automation Bot | v2.1 (Full Features)
 {RESET}"""
 
+PRAYER_MESSAGES = [
+    "Semoga ekosistem 9Chain semakin sukses, berkah, dan maju untuk semua.",
+    "Wishing health, happiness, and peace for everyone in 9Chain community.",
+    "May this project bring good fortune and growth to all nodes.",
+    "Semoga hari ini penuh berkah dan kelancaran untuk kita semua.",
+    "Peace, prosperity, and blessings to the global 9Chain family.",
+    "Keep building, keep growing, wishing success for 9Chain testnet and mainnet."
+]
+
 def mask_email(email):
-    """Menyamarkan email untuk keamanan log."""
+    """Menyamarkan email untuk privasi dan keamanan tampilan log."""
     if not email or "@" not in email:
         return email
     user, domain = email.split("@", 1)
@@ -85,7 +94,8 @@ class NineChainBot:
             "taps_done": 0,
             "taps_remaining": 0,
             "upgrades": [],
-            "quests_claimed": 0
+            "quests_claimed": 0,
+            "pray_status": "Skipped"
         }
 
     def log(self, message, level="INFO"):
@@ -247,9 +257,9 @@ class NineChainBot:
         self.stats["taps_done"] = total_pushed
         self.log(f"Selesai PUSH! Total +{total_pushed} Taps berhasil ditambahkan.", "SUCCESS")
 
-    def auto_upgrade(self):
+    def auto_upgrade_components(self):
         """Mengecek katalog hardware dan otomatis menaikkan level modul yang terjangkau."""
-        self.log("Memeriksa kemungkinan Upgrade Hardware...", "INFO")
+        self.log("Memeriksa kemungkinan Upgrade Modul Hardware (CPU/RAM/Module)...", "INFO")
         try:
             res = self.session.get(f"{API_BASE}/program/catalog", timeout=15)
             if res.status_code != 200:
@@ -265,26 +275,62 @@ class NineChainBot:
                     next_lvl = comp.get("level", 0) + 1
 
                     if current_xp >= cost:
-                        self.log(f"Poin cukup ({current_xp:.1f} >= {cost:.1f}). Mengupgrade {key.upper()} ke Lv.{next_lvl}...", "INFO")
+                        self.log(f"Poin cukup ({current_xp:.1f} >= {cost:.1f}). Mengupgrade modul {key.upper()} ke Lv.{next_lvl}...", "INFO")
                         up_res = self.session.post(f"{API_BASE}/program/upgrade", json={
                             "componentKey": key,
                             "toLevel": next_lvl
                         }, timeout=15)
 
                         if up_res.status_code in [200, 201]:
-                            self.log(f"Upgrade {key.upper()} Lv.{next_lvl} Berhasil!", "SUCCESS")
+                            self.log(f"Upgrade modul {key.upper()} Lv.{next_lvl} Berhasil!", "SUCCESS")
                             self.stats["upgrades"].append(f"{key.upper()} Lv.{next_lvl}")
                             current_xp -= cost
                             self.stats["xp_total"] = str(current_xp)
                         else:
                             err = up_res.json().get("error", {}).get("message", "")
-                            self.log(f"Upgrade {key.upper()} gagal: {err}", "WARN")
+                            self.log(f"Upgrade modul {key.upper()} gagal: {err}", "WARN")
         except Exception as e:
-            self.log(f"Error saat cek upgrade: {e}", "WARN")
+            self.log(f"Error saat cek upgrade modul: {e}", "WARN")
+
+    def auto_upgrade_node_tier(self):
+        """Mengecek apakah poin mencukupi untuk upgrade tingkatan Node Tier (Tier 1 -> Tier 2 -> Tier 3)."""
+        self.log("Memeriksa kemungkinan Upgrade Node Tier...", "INFO")
+        try:
+            res = self.session.get(f"{API_BASE}/program/catalog", timeout=15)
+            if res.status_code != 200:
+                return
+
+            data = res.json().get("data", res.json())
+            tiers = data.get("tiers", [])
+            current_tier = int(self.stats.get("tier", 1))
+            current_xp = float(self.stats.get("xp_total", "0"))
+
+            for t in tiers:
+                tier_num = t.get("tier") or t.get("level")
+                if tier_num == current_tier + 1:
+                    cost = float(t.get("cost", 0) or t.get("xpCost", 0) or t.get("price", 0))
+                    if cost > 0 and current_xp >= cost:
+                        self.log(f"Poin cukup ({current_xp:.1f} >= {cost:.1f}). Mengupgrade Node ke Tier {tier_num}...", "INFO")
+                        up_res = self.session.post(
+                            f"{API_BASE}/program/node/upgrade",
+                            json={"toTier": tier_num},
+                            timeout=15
+                        )
+                        if up_res.status_code in [200, 201]:
+                            self.stats["tier"] = tier_num
+                            self.stats["upgrades"].append(f"Node Tier {tier_num}")
+                            self.log(f"Upgrade Node ke Tier {tier_num} Berhasil!", "SUCCESS")
+                            current_xp -= cost
+                            self.stats["xp_total"] = str(current_xp)
+                        else:
+                            err = up_res.json().get("error", {}).get("message", "")
+                            self.log(f"Upgrade Node Tier {tier_num} gagal: {err}", "WARN")
+        except Exception as e:
+            self.log(f"Error saat cek upgrade node tier: {e}", "WARN")
 
     def claim_quests(self):
-        """Mengecek misi harian dan otomatis mengklaim reward."""
-        self.log("Memeriksa Quests harian...", "INFO")
+        """Mengecek misi harian & sosial, lalu otomatis mengklaim reward yang sudah selesai."""
+        self.log("Memeriksa Quests harian & sosial...", "INFO")
         try:
             res = self.session.get(f"{API_BASE}/program/quests", timeout=15)
             if res.status_code != 200:
@@ -295,7 +341,7 @@ class NineChainBot:
 
             for q in quests:
                 quest_key = q.get("key") or q.get("questKey")
-                is_completed = q.get("completed", False) or q.get("isCompleted", False)
+                is_completed = q.get("completed", False) or q.get("isCompleted", False) or q.get("canClaim", False)
                 is_claimed = q.get("claimed", False) or q.get("isClaimed", False)
 
                 if is_completed and not is_claimed and quest_key:
@@ -307,8 +353,35 @@ class NineChainBot:
             self.stats["quests_claimed"] = claimed_count
             if claimed_count > 0:
                 self.log(f"Total {claimed_count} quest berhasil diklaim.", "SUCCESS")
+            else:
+                self.log("Tidak ada quest yang perlu diklaim.", "INFO")
         except Exception as e:
             self.log(f"Error cek quest: {e}", "WARN")
+
+    def send_prayer(self, room_slug="together", custom_text=None):
+        """Mengirim pesan doa komunitas harian ke room Pray Together."""
+        self.log(f"Memeriksa fitur Pray Together (Room: '{room_slug}')...", "INFO")
+        try:
+            # 1. Join room
+            self.session.post(f"{API_BASE}/prayer/rooms/{room_slug}/join", json={}, timeout=15)
+
+            # 2. Kirim pesan doa
+            text = custom_text or random.choice(PRAYER_MESSAGES)
+            res = self.session.post(
+                f"{API_BASE}/prayer/rooms/{room_slug}/messages",
+                json={"text": text},
+                timeout=15
+            )
+            if res.status_code in [200, 201]:
+                self.stats["pray_status"] = "Sent"
+                self.log(f"Doa komunitas terkirim ke room '{room_slug}'! (\"{text[:35]}...\")", "SUCCESS")
+            else:
+                err = res.json().get("error", {}).get("message") or res.json().get("message") or f"HTTP {res.status_code}"
+                self.stats["pray_status"] = "Failed"
+                self.log(f"Kirim doa gagal: {err}", "WARN")
+        except Exception as e:
+            self.stats["pray_status"] = "Error"
+            self.log(f"Error Pray Together: {e}", "WARN")
 
 
 def send_telegram_notification(tg_config, all_stats):
@@ -331,10 +404,12 @@ def send_telegram_notification(tg_config, all_stats):
         
         text += f"{status_icon} <b>{s['name']}</b> (Tier {s['tier']})\n"
         text += f"• Daily Gift: <b>{s.get('daily_gift', '-')}</b>\n"
+        text += f"• Pray Together: <b>{s.get('pray_status', '-')}</b>\n"
         text += f"• Total LOVE9: <b>{s['xp_total']}</b>\n"
         text += f"• Mining Rate: <b>{s['contribution_rate']}/jam</b>\n"
         text += f"• PUSH Selesai: <b>+{s['taps_done']} taps</b>\n"
-        text += f"• Upgrade Hardware: {upgrades_str}\n"
+        text += f"• Quests Claimed: <b>+{s['quests_claimed']}</b>\n"
+        text += f"• Upgrade: {upgrades_str}\n"
         text += "────────────────────────\n"
 
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -404,15 +479,24 @@ def run_all_accounts(config):
                     delay_max=delay_max
                 )
 
-            # 4. Auto Upgrade Komponen Node
-            if settings.get("auto_upgrade_node", True):
-                bot.auto_upgrade()
+            # 4. Auto Upgrade Modul Hardware (CPU, RAM, Anti-Sybil)
+            if settings.get("auto_upgrade_node", True) or settings.get("auto_upgrade_components", True):
+                bot.auto_upgrade_components()
 
-            # 5. Klaim Quest yang selesai
+            # 5. Auto Upgrade Node Tier (Tier 1 -> Tier 2 -> Tier 3)
+            if settings.get("auto_upgrade_node_tier", True):
+                bot.auto_upgrade_node_tier()
+
+            # 6. Auto Klaim Quest (Quests harian / sosial yang sudah selesai)
             if settings.get("auto_claim_quests", True):
                 bot.claim_quests()
 
-            # Ambil state terakhir setelah aksi
+            # 7. Auto Chat Pray Together (Doa Harian Komunitas)
+            if settings.get("auto_pray", True):
+                room_slug = settings.get("pray_room", "together")
+                bot.send_prayer(room_slug=room_slug)
+
+            # Ambil state terakhir setelah semua aksi
             bot.fetch_state()
 
         summary_stats.append(bot.stats)

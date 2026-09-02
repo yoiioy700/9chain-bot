@@ -15,19 +15,20 @@
 
 ---
 
-## ✨ Fitur Utama
+## ✨ Daftar Lengkap Task & Fitur Otomatis
 
-| Fitur | Deskripsi |
-| :--- | :--- |
-| 🔄 **24/7 Loop Mode** | Berjalan otomatis tanpa henti dengan jeda siklus yang bisa dikonfigurasi + *live countdown timer*. |
-| 🔐 **Headless Email Login** | Login otomatis via Email & Password langsung melalui REST API resmi tanpa browser. |
-| 🔑 **Token Auth Support** | Mendukung login langsung via Access Token (JWT). |
-| 🎁 **Auto Daily Check-in** | Mengklaim hadiah streak harian (*Daily Gift*) secara otomatis (`/me/check-in`). |
-| ⚡ **Auto Push Taps** | Menghabiskan 1.000 kuota tap harian dengan batch request aman dan delay natural. |
-| 🛠️ **Auto Hardware Upgrade**| Otomatis menaikkan level modul hardware (CPU, RAM, Anti-Sybil) jika poin LOVE9 mencukupi. |
-| 📋 **Auto Claim Quests** | Memeriksa dan mengklaim reward misi harian yang sudah rampung secara otomatis. |
-| 🌐 **Multi-Account & Proxy**| Menjalankan banyak akun secara terisolasi dan mendukung proxy HTTP/HTTPS. |
-| 📱 **Telegram Notification**| Mengirim ringkasan laporan status akun langsung ke bot Telegram Anda. |
+| Task / Fitur | Status | Deskripsi |
+| :--- | :---: | :--- |
+| 🔄 **24/7 Auto Loop** | ✅ | Berjalan otomatis tanpa henti dengan jeda siklus + *live countdown timer*. |
+| 🔐 **Headless Login** | ✅ | Login otomatis via Email & Password langsung ke API resmi (tanpa browser). |
+| 🎁 **Auto Daily Check-in** | ✅ | Mengklaim hadiah streak harian (*Daily Gift*) secara otomatis (`/me/check-in`). |
+| ⚡ **Auto Push Taps** | ✅ | Menghabiskan kuota tap harian dengan kecepatan & jeda yang bisa diatur (*human-like*). |
+| 🛠️ **Auto Hardware Upgrade** | ✅ | Otomatis menaikkan level modul hardware (CPU, RAM, Anti-Sybil, Storage) jika poin cukup. |
+| ⬆️ **Auto Node Tier Upgrade** | ✅ | Otomatis menaikkan tingkatan Node Tier (Tier 1 → Tier 2 → Tier 3) jika poin mencukupi. |
+| 📋 **Auto Claim Quests** | ✅ | Memindai dan mengklaim seluruh reward misi harian & sosial yang sudah selesai (`/program/quests`). |
+| 💬 **Auto Pray Chat** | ✅ | Otomatis bergabung ke room doa komunitas dan mengirim pesan doa harian (`/prayer/rooms`). |
+| 🌐 **Multi-Account & Proxy** | ✅ | Menjalankan banyak akun secara berurutan dengan sesi terisolasi + proxy support. |
+| 📱 **Telegram Notification** | ✅ | Laporan detail status node, total poin, perolehan harian, dan riwayat upgrade. |
 
 ---
 
@@ -49,10 +50,6 @@ pip install -r requirements.txt
 Salin template konfigurasi:
 ```bash
 cp accounts.example.json accounts.json
-```
-
-Buka dan edit file `accounts.json`:
-```bash
 nano accounts.json
 ```
 
@@ -73,8 +70,14 @@ nano accounts.json
     "auto_daily_gift": true,
     "auto_push_taps": true,
     "max_taps": 1000,
-    "auto_upgrade_node": true,
-    "auto_claim_quests": true
+    "tap_batch_size": 5,
+    "tap_delay_min": 1.0,
+    "tap_delay_max": 2.5,
+    "auto_upgrade_components": true,
+    "auto_upgrade_node_tier": true,
+    "auto_claim_quests": true,
+    "auto_pray": true,
+    "pray_room": "together"
   },
   "accounts": [
     {
@@ -83,30 +86,24 @@ nano accounts.json
       "password": "password_akun_anda",
       "totp_code": "",
       "proxy": ""
-    },
-    {
-      "name": "Akun 2 (Tuyul)",
-      "email": "akun2@gmail.com",
-      "password": "password_akun2",
-      "totp_code": "",
-      "proxy": ""
     }
   ]
 }
 ```
 
-### 💡 Penjelasan Pengaturan:
-* **`loop_mode`**: `true` agar bot berjalan terus 24/7. Set ke `false` jika ingin bot berjalan sekali saja lalu selesai.
-* **`loop_interval_hours`**: Waktu tunggu (dalam jam) sebelum siklus berikutnya dijalankan (rekomendasi: `6`).
-* **`max_taps`**: Maksimal kuota tap harian yang diproses (default: `1000`).
-* **`tap_batch_size`**: Jumlah tap per request (default: `5` tap, bisa diatur `1` sampai `50`).
-* **`tap_delay_min` & `tap_delay_max`**: Rentang jeda santai antar tap dalam detik (default: `1.0` - `2.5` detik).
+### 💡 Penjelasan Pengaturan Task:
+* **`loop_mode`**: `true` agar bot berjalan 24/7.
+* **`loop_interval_hours`**: Jeda waktu antar siklus dalam jam (misal `6` jam sekali).
+* **`tap_batch_size`**: Jumlah tap per request (default `5` tap, bisa disetel 1-50).
+* **`tap_delay_min` & `tap_delay_max`**: Rentang jeda santai antar tap dalam detik (`1.0` - `2.5` detik).
+* **`auto_upgrade_components`**: Otomatis upgrade level modul CPU, RAM, Anti-Sybil jika poin LOVE9 cukup.
+* **`auto_upgrade_node_tier`**: Otomatis naikkan tingkatan Node Tier (Tier 1 ➔ Tier 2 ➔ Tier 3).
+* **`auto_claim_quests`**: Otomatis klaim semua quest yang sudah selesai.
+* **`auto_pray`**: Otomatis mengirim pesan doa komunitas ke room `pray_room` (default: `"together"`).
 
 ---
 
 ## 🖥️ Menjalankan 24/7 di Background VPS (Screen)
-
-Agar bot tetap aktif di VPS meskipun koneksi SSH Anda terputus:
 
 ```bash
 # 1. Buat session screen baru
@@ -119,12 +116,7 @@ python3 bot.py
 # Tekan tombol CTRL + A lalu tekan D
 ```
 
-**Mengecek bot kembali di kemudian hari:**
+**Melihat bot kembali:**
 ```bash
 screen -r 9chain
 ```
-
----
-
-## ⚠️ Disclaimer
-Bot ini dibuat untuk tujuan otomasi dan edukasi. Gunakan dengan bijak sesuai dengan ketentuan layanan 9Chain.
