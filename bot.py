@@ -285,30 +285,26 @@ def send_telegram_notification(tg_config, all_stats):
         print(f"\n[!] Gagal mengirim notifikasi Telegram: {e}")
 
 
-def main():
-    config_path = os.path.join(os.path.dirname(__file__), "accounts.json")
-    example_path = os.path.join(os.path.dirname(__file__), "accounts.example.json")
+def sleep_with_countdown(seconds):
+    """Menampilkan countdown timer yang rapi sebelum siklus berikutnya."""
+    while seconds > 0:
+        hrs = seconds // 3600
+        mins = (seconds % 3600) // 60
+        secs = seconds % 60
+        print(f"\r⏳ Menunggu siklus berikutnya: {hrs:02d}:{mins:02d}:{secs:02d} ...", end="", flush=True)
+        time.sleep(1)
+        seconds -= 1
+    print("\r" + " " * 60 + "\r", end="", flush=True)
 
-    if not os.path.exists(config_path):
-        if os.path.exists(example_path):
-            import shutil
-            shutil.copy(example_path, config_path)
-            print(f"[!] File accounts.json otomatis dibuat dari accounts.example.json.")
-            print(f"[*] Silakan edit file accounts.json dan masukkan akun Anda:")
-            print("    nano accounts.json")
-        else:
-            print(f"✗ File {config_path} tidak ditemukan!")
-        return
 
-    with open(config_path, "r", encoding="utf-8") as f:
-        config = json.load(f)
-
+def run_all_accounts(config):
     settings = config.get("settings", {})
     accounts = config.get("accounts", [])
     tg_config = config.get("telegram", {})
 
     print("=" * 60)
     print(f"🚀 9Chain All-in-One Bot | Total: {len(accounts)} Akun")
+    print(f"⏰ Waktu Eksekusi: {time.strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60)
 
     summary_stats = []
@@ -360,8 +356,52 @@ def main():
     send_telegram_notification(tg_config, summary_stats)
 
     print("\n" + "=" * 60)
-    print("🎉 SEMUA AKUN SELESAI DIPROSES!")
+    print("🎉 SEMUA AKUN SELESAI DIPROSES PADA SIKLUS INI!")
     print("=" * 60)
+
+
+def main():
+    config_path = os.path.join(os.path.dirname(__file__), "accounts.json")
+    example_path = os.path.join(os.path.dirname(__file__), "accounts.example.json")
+
+    if not os.path.exists(config_path):
+        if os.path.exists(example_path):
+            import shutil
+            shutil.copy(example_path, config_path)
+            print(f"[!] File accounts.json otomatis dibuat dari accounts.example.json.")
+            print(f"[*] Silakan edit file accounts.json dan masukkan akun Anda:")
+            print("    nano accounts.json")
+        else:
+            print(f"✗ File {config_path} tidak ditemukan!")
+        return
+
+    try:
+        while True:
+            # Reload config tiap siklus agar perubahan setting/akun langsung terbaca
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+            except Exception as e:
+                print(f"✗ Gagal membaca accounts.json: {e}")
+                time.sleep(10)
+                continue
+
+            settings = config.get("settings", {})
+            loop_mode = settings.get("loop_mode", True)
+            loop_hours = settings.get("loop_interval_hours", 6)
+
+            run_all_accounts(config)
+
+            if not loop_mode:
+                print("\n[ℹ️] Loop mode nonaktif (loop_mode: false). Bot berhenti.")
+                break
+
+            interval_seconds = int(loop_hours * 3600)
+            print(f"\n💤 Mode 24/7 Aktif. Bot akan tidur selama {loop_hours} jam.")
+            sleep_with_countdown(interval_seconds)
+            print("\n🔄 Memulai siklus baru...")
+    except KeyboardInterrupt:
+        print("\n\n🛑 Bot dihentikan oleh pengguna (Ctrl+C). Sampai jumpa!")
 
 if __name__ == "__main__":
     main()

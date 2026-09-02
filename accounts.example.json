@@ -5,6 +5,8 @@
     "chat_id": "YOUR_TELEGRAM_CHAT_ID"
   },
   "settings": {
+    "loop_mode": true,
+    "loop_interval_hours": 6,
     "auto_daily_gift": true,
     "auto_push_taps": true,
     "max_taps": 1000,
@@ -13,15 +15,15 @@
   },
   "accounts": [
     {
-      "name": "Akun 1 (Login via Token)",
-      "token": "PASTE_ACCESS_TOKEN_ANDA_DI_SINI",
+      "name": "Akun 1 (Login Email)",
+      "email": "email_anda@gmail.com",
+      "password": "password_anda",
+      "totp_code": "",
       "proxy": ""
     },
     {
-      "name": "Akun 2 (Login via Email & Password)",
-      "email": "user@example.com",
-      "password": "password_anda",
-      "totp_code": "",
+      "name": "Akun 2 (Login Token)",
+      "token": "PASTE_ACCESS_TOKEN_ANDA_DI_SINI",
       "proxy": ""
     }
   ]
