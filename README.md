@@ -1,23 +1,64 @@
-# 9Chain All-in-One Multi-Account Bot 🚀
+<div align="center">
 
-Bot automasi terminal super ringan untuk platform **9Chain** (https://www.9chain.com).
-Didesain khusus untuk VPS Headless low-spec (tidak butuh Chromium / browser GUI, hanya butuh RAM ~15 MB).
+# 🚀 9Chain All-in-One Automation Bot
 
-## Fitur Utama
-1. **Mode 24/7 Non-Stop (Auto-Loop)**: Berjalan otomatis terus-menerus dengan jeda siklus yang bisa diatur (misal per 6 jam) dan countdown timer live.
-2. **Auto Login Headless (Email & Password)**: Mendukung login otomatis menggunakan **Email & Password** maupun langsung via **Access Token (JWT)**.
-3. **Auto Daily Gift / Streak**: Otomatis mengklaim hadiah check-in harian (`/me/check-in`).
-4. **Auto Push Taps**: Eksekusi 1.000 tap harian otomatis dengan batch request efisien dan jeda natural.
-5. **Auto Hardware Upgrade**: Otomatis menaikkan level modul hardware (CPU, RAM, Anti-Sybil) jika poin LOVE9 mencukupi.
-6. **Auto Claim Quests**: Otomatis memeriksa dan mengklaim reward misi harian yang sudah selesai.
-7. **Multi-Account & Proxy Support**: Menjalankan banyak akun secara berurutan dengan sesi terisolasi dan dukungan proxy HTTP/HTTPS.
-8. **Telegram Notification**: Mengirim laporan ringkasan eksekusi harian ke bot Telegram Anda.
+**Bot Terminal Otomatis 24/7 Super Ringan untuk Ekosistem 9Chain**
+
+[![Platform](https://img.shields.io/badge/Platform-9Chain-blue.svg)](https://www.9chain.com)
+[![Python](https://img.shields.io/badge/Python-3.8%2B-green.svg)](https://python.org)
+[![Headless](https://img.shields.io/badge/Mode-100%25%20Headless-success.svg)]()
+[![License](https://img.shields.io/badge/License-MIT-purple.svg)]()
+
+*Didesain khusus untuk VPS Headless low-spec (tidak memerlukan Chromium/Browser GUI, konsumsi RAM hanya ~15 MB).*
+
+</div>
 
 ---
 
-## Cara Konfigurasi Akun (`accounts.json`)
+## ✨ Fitur Utama
 
-Anda bisa menggunakan **Email & Password** atau **Access Token**:
+| Fitur | Deskripsi |
+| :--- | :--- |
+| 🔄 **24/7 Loop Mode** | Berjalan otomatis tanpa henti dengan jeda siklus yang bisa dikonfigurasi + *live countdown timer*. |
+| 🔐 **Headless Email Login** | Login otomatis via Email & Password langsung melalui REST API resmi tanpa browser. |
+| 🔑 **Token Auth Support** | Mendukung login langsung via Access Token (JWT). |
+| 🎁 **Auto Daily Check-in** | Mengklaim hadiah streak harian (*Daily Gift*) secara otomatis (`/me/check-in`). |
+| ⚡ **Auto Push Taps** | Menghabiskan 1.000 kuota tap harian dengan batch request aman dan delay natural. |
+| 🛠️ **Auto Hardware Upgrade**| Otomatis menaikkan level modul hardware (CPU, RAM, Anti-Sybil) jika poin LOVE9 mencukupi. |
+| 📋 **Auto Claim Quests** | Memeriksa dan mengklaim reward misi harian yang sudah rampung secara otomatis. |
+| 🌐 **Multi-Account & Proxy**| Menjalankan banyak akun secara terisolasi dan mendukung proxy HTTP/HTTPS. |
+| 📱 **Telegram Notification**| Mengirim ringkasan laporan status akun langsung ke bot Telegram Anda. |
+
+---
+
+## 🚀 Panduan Instalasi & Penggunaan (Mulai dari Nol)
+
+### 1. Clone Repository
+```bash
+git clone https://github.com/yoiioy700/9chain-bot.git
+cd 9chain-bot
+```
+
+### 2. Install Dependensi
+```bash
+pip install -r requirements.txt
+```
+*(atau `pip3 install -r requirements.txt`)*
+
+### 3. Konfigurasi `accounts.json`
+Salin template konfigurasi:
+```bash
+cp accounts.example.json accounts.json
+```
+
+Buka dan edit file `accounts.json`:
+```bash
+nano accounts.json
+```
+
+---
+
+## ⚙️ Contoh Format `accounts.json`
 
 ```json
 {
@@ -37,9 +78,16 @@ Anda bisa menggunakan **Email & Password** atau **Access Token**:
   },
   "accounts": [
     {
-      "name": "Akun 1 (Login Email)",
+      "name": "Akun Utama",
       "email": "email_anda@gmail.com",
-      "password": "password_anda",
+      "password": "password_akun_anda",
+      "totp_code": "",
+      "proxy": ""
+    },
+    {
+      "name": "Akun 2 (Tuyul)",
+      "email": "akun2@gmail.com",
+      "password": "password_akun2",
       "totp_code": "",
       "proxy": ""
     }
@@ -47,35 +95,17 @@ Anda bisa menggunakan **Email & Password** atau **Access Token**:
 }
 ```
 
-* **`loop_mode`**: `true` jika ingin bot berjalan terus 24/7 non-stop. Set ke `false` jika ingin bot jalan sekali lalu selesai (misal jika pakai cron job).
-* **`loop_interval_hours`**: Jarak waktu (dalam jam) sebelum bot mengulang memproses akun Anda kembali (rekomendasi: `6` atau `8` jam).
+### 💡 Penjelasan Pengaturan:
+* **`loop_mode`**: `true` agar bot berjalan terus 24/7. Set ke `false` jika ingin bot berjalan sekali saja lalu selesai.
+* **`loop_interval_hours`**: Waktu tunggu (dalam jam) sebelum siklus berikutnya dijalankan (rekomendasi: `6`).
+* **`max_taps`**: Maksimal kuota tap harian yang diproses (default: `1000`).
 
 ---
 
-## Cara Instalasi & Menjalankan di VPS (24/7)
+## 🖥️ Menjalankan 24/7 di Background VPS (Screen)
 
-### 1. Clone Repository
-```bash
-git clone https://github.com/yoiioy700/9chain-bot.git
-cd 9chain-bot
-```
+Agar bot tetap aktif di VPS meskipun koneksi SSH Anda terputus:
 
-### 2. Install Dependensi
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Konfigurasi `accounts.json`
-```bash
-cp accounts.example.json accounts.json
-nano accounts.json
-```
-
-### 4. Jalankan 24/7 di Background dengan `screen` atau `tmux`
-
-Agar bot tetap berjalan di VPS meskipun terminal/SSH Anda ditutup:
-
-**Menggunakan `screen` (Paling Mudah):**
 ```bash
 # 1. Buat session screen baru
 screen -S 9chain
@@ -83,10 +113,16 @@ screen -S 9chain
 # 2. Jalankan bot
 python3 bot.py
 
-# 3. Tekan CTRL + A lalu tekan D untuk detach (keluar dari screen tanpa mematikan bot)
+# 3. Keluar dari screen tanpa mematikan bot:
+# Tekan tombol CTRL + A lalu tekan D
 ```
 
-Untuk melihat kembali bot yang sedang berjalan:
+**Mengecek bot kembali di kemudian hari:**
 ```bash
 screen -r 9chain
 ```
+
+---
+
+## ⚠️ Disclaimer
+Bot ini dibuat untuk tujuan otomasi dan edukasi. Gunakan dengan bijak sesuai dengan ketentuan layanan 9Chain.

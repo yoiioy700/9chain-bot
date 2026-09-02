@@ -1,4 +1,12 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+9Chain All-in-One Multi-Account Bot (24/7 Headless)
+GitHub: https://github.com/yoiioy700/9chain-bot
+"""
+
 import os
+import sys
 import json
 import time
 import uuid
@@ -7,9 +15,41 @@ import requests
 
 API_BASE = "https://api.9chain.com/v2"
 
+# Terminal Color Codes (ANSI)
+CYAN = "\033[96m"
+GREEN = "\033[92m"
+YELLOW = "\033[93m"
+RED = "\033[91m"
+MAGENTA = "\033[95m"
+BOLD = "\033[1m"
+DIM = "\033[2m"
+RESET = "\033[0m"
+
+BANNER = f"""{CYAN}{BOLD}
+  ██████╗  ██████╗██╗  ██╗ █████╗ ██╗███╗   ██╗
+  ██╔══██╗██╔════╝██║  ██║██╔══██╗██║████╗  ██║
+  ╚██████╔╝██║     ███████║███████║██║██╔██╗ ██║
+   ╚═══██║ ██║     ██╔══██║██╔══██║██║██║╚██╗██║
+  ██████╔╝ ╚██████╗██║  ██║██║  ██║██║██║ ╚████║
+  ╚═════╝   ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝
+{RESET}{DIM}  9Chain Virtual Node 24/7 Automation Bot | v2.0
+{RESET}"""
+
+def mask_email(email):
+    """Menyamarkan email untuk keamanan log."""
+    if not email or "@" not in email:
+        return email
+    user, domain = email.split("@", 1)
+    if len(user) <= 2:
+        masked_user = user[0] + "*"
+    else:
+        masked_user = user[0] + "*" * (len(user) - 2) + user[-1]
+    return f"{masked_user}@{domain}"
+
+
 class NineChainBot:
     def __init__(self, account_config):
-        self.name = account_config.get("name", "Unknown Account")
+        self.name = account_config.get("name", "Akun")
         self.email = account_config.get("email", "").strip()
         self.password = account_config.get("password", "").strip()
         self.totp_code = account_config.get("totp_code", "").strip()
@@ -21,7 +61,6 @@ class NineChainBot:
         if self.proxy:
             self.session.proxies = {"http": self.proxy, "https": self.proxy}
 
-        # Bersihkan kata 'Bearer ' jika ada
         clean_token = self.token.replace("Bearer ", "").strip()
 
         self.session.headers.update({
@@ -49,16 +88,28 @@ class NineChainBot:
             "quests_claimed": 0
         }
 
+    def log(self, message, level="INFO"):
+        prefix = {
+            "INFO": f"{CYAN}[INFO]{RESET}",
+            "SUCCESS": f"{GREEN}[✓]{RESET}",
+            "WARN": f"{YELLOW}[!]{RESET}",
+            "ERROR": f"{RED}[✗]{RESET}",
+            "STEP": f"{MAGENTA}[▶]{RESET}"
+        }.get(level, f"[{level}]")
+        print(f"[{self.name}] {prefix} {message}")
+
     def login(self):
-        """Melakukan login menggunakan email dan password jika token belum ada."""
+        """Melakukan login headless via Email & Password jika belum memiliki access token."""
         if self.token and not self.token.startswith("PASTE_"):
             return True
 
-        if not self.email or not self.password or self.email.startswith("akun"):
-            print(f"[{self.name}] ✗ Token atau Email/Password belum dikonfigurasi dengan benar di accounts.json!")
+        if not self.email or not self.password or self.email.startswith("akun") or self.email.startswith("user@"):
+            self.log("Token atau Email/Password belum diisi dengan benar di accounts.json!", "ERROR")
             return False
 
-        print(f"[{self.name}] 🔐 Mencoba login dengan email: {self.email}...")
+        masked = mask_email(self.email)
+        self.log(f"Mencoba login headless ({masked})...", "INFO")
+        
         payload = {
             "email": self.email,
             "password": self.password
@@ -66,29 +117,32 @@ class NineChainBot:
         if self.totp_code:
             payload["totpCode"] = self.totp_code
 
-        try:
-            res = self.session.post(f"{API_BASE}/auth/login", json=payload, timeout=20)
-            if res.status_code in [200, 201]:
-                res_data = res.json()
-                access_token = res_data.get("accessToken") or res_data.get("data", {}).get("accessToken")
-                if access_token:
-                    self.token = access_token
-                    self.session.headers["Authorization"] = f"Bearer {self.token}"
-                    print(f"[{self.name}] ✓ Login Email Sukses! Access Token diperoleh.")
-                    return True
+        for attempt in range(1, 4):
+            try:
+                res = self.session.post(f"{API_BASE}/auth/login", json=payload, timeout=20)
+                if res.status_code in [200, 201]:
+                    res_data = res.json()
+                    access_token = res_data.get("accessToken") or res_data.get("data", {}).get("accessToken")
+                    if access_token:
+                        self.token = access_token
+                        self.session.headers["Authorization"] = f"Bearer {self.token}"
+                        self.log("Login Email Sukses! Sesi aktif.", "SUCCESS")
+                        return True
+                    else:
+                        self.log(f"Format respon login tidak dikenali: {res_data}", "ERROR")
+                        return False
                 else:
-                    print(f"[{self.name}] ✗ Format respon login tidak sesuai: {res_data}")
+                    err_msg = res.json().get("message") or res.json().get("error", {}).get("message") or f"HTTP {res.status_code}"
+                    self.log(f"Gagal login: {err_msg}", "ERROR")
                     return False
-            else:
-                err_msg = res.json().get("message") or res.json().get("error", {}).get("message") or f"HTTP {res.status_code}"
-                print(f"[{self.name}] ✗ Gagal login: {err_msg}")
-                return False
-        except Exception as e:
-            print(f"[{self.name}] ✗ Error saat melakukan login: {e}")
-            return False
+            except Exception as e:
+                self.log(f"Percobaan login {attempt}/3 gagal ({e}). Mengulang...", "WARN")
+                time.sleep(2)
+        
+        return False
 
     def enter_node(self):
-        """Memulai / mengaktifkan sesi virtual node."""
+        """Menginisialisasi sesi Virtual Node."""
         try:
             self.session.post(f"{API_BASE}/program/enter", timeout=15)
         except Exception:
@@ -96,7 +150,7 @@ class NineChainBot:
 
     def daily_checkin(self):
         """Mengklaim hadiah harian (Daily Gift / Streak)."""
-        print(f"[{self.name}] 🎁 Memeriksa Daily Gift / Check-in...")
+        self.log("Memeriksa Daily Gift / Check-in...", "INFO")
         try:
             res = self.session.post(f"{API_BASE}/me/check-in", timeout=15)
             if res.status_code in [200, 201]:
@@ -105,24 +159,23 @@ class NineChainBot:
                 already = data.get("alreadyCheckedIn", False) or data.get("data", {}).get("alreadyCheckedIn", False)
                 if already:
                     self.stats["daily_gift"] = "Already Claimed"
-                    print(f"[{self.name}] ℹ️ Daily Gift hari ini sudah diklaim sebelumnya.")
+                    self.log("Daily Gift hari ini sudah diklaim sebelumnya.", "INFO")
                 else:
                     self.stats["daily_gift"] = f"Claimed (+{reward})"
-                    print(f"[{self.name}] ✓ Daily Gift Berhasil Diklaim! (+{reward} LOVE9)")
+                    self.log(f"Daily Gift Berhasil Diklaim! (+{reward} LOVE9)", "SUCCESS")
             elif res.status_code == 400:
                 self.stats["daily_gift"] = "Already Claimed"
-                print(f"[{self.name}] ℹ️ Daily Gift sudah diklaim hari ini.")
+                self.log("Daily Gift sudah diklaim hari ini.", "INFO")
             else:
                 err = res.json().get("error", {}).get("message", f"HTTP {res.status_code}")
                 self.stats["daily_gift"] = "Failed"
-                print(f"[{self.name}] - Respon Check-in: {err}")
+                self.log(f"Respon Check-in: {err}", "WARN")
         except Exception as e:
             self.stats["daily_gift"] = "Error"
-            print(f"[{self.name}] - Error Daily Check-in: {e}")
+            self.log(f"Error Daily Check-in: {e}", "WARN")
 
     def fetch_state(self):
-        """Mengambil state dan informasi poin node."""
-        print(f"[{self.name}] 🔑 Mengambil status Virtual Node...")
+        """Mengambil informasi poin, kuota tap, dan level node."""
         try:
             res = self.session.get(f"{API_BASE}/program/state", timeout=15)
             if res.status_code == 200:
@@ -133,31 +186,30 @@ class NineChainBot:
                 self.stats["contribution_rate"] = str(data.get("contributionRate", "0"))
                 self.stats["taps_remaining"] = int(data.get("tapsRemaining", 0))
 
-                print(f"[{self.name}] ✓ Node Terhubung (Tier {self.stats['tier']})")
-                print(f"[{self.name}] 📊 Total LOVE9: {self.stats['xp_total']} | Mining Rate: {self.stats['contribution_rate']}/jam | Sisa Tap: {self.stats['taps_remaining']}")
+                self.log(f"Status Node: Tier {self.stats['tier']} | Rate: {self.stats['contribution_rate']}/jam | Total LOVE9: {self.stats['xp_total']} | Sisa Tap: {self.stats['taps_remaining']}", "SUCCESS")
                 return data
             elif res.status_code == 401:
-                print(f"[{self.name}] ✗ Token Kadaluarsa (HTTP 401). Memerlukan login ulang / token baru.")
+                self.log("Token Kedaluwarsa (HTTP 401). Memerlukan login ulang.", "ERROR")
                 return None
             else:
                 err = res.json().get("error", {}).get("message", f"HTTP {res.status_code}")
-                print(f"[{self.name}] ✗ Error server: {err}")
+                self.log(f"Error server: {err}", "ERROR")
                 return None
         except Exception as e:
-            print(f"[{self.name}] ✗ Error koneksi: {e}")
+            self.log(f"Error koneksi state: {e}", "ERROR")
             return None
 
     def push_taps(self, max_taps=1000):
-        """Melakukan auto-tap / PUSH hingga kuota habis."""
+        """Melakukan auto-tap / PUSH hingga kuota hari ini habis."""
         taps_to_do = self.stats["taps_remaining"]
         if max_taps:
             taps_to_do = min(taps_to_do, max_taps)
 
         if taps_to_do <= 0:
-            print(f"[{self.name}] ⚡ Kuota PUSH tap harian sudah habis (0 remaining).")
+            self.log("Kuota PUSH tap harian sudah habis (0 remaining).", "INFO")
             return
 
-        print(f"[{self.name}] ⚡ Memulai Auto-Push {taps_to_do} Taps...")
+        self.log(f"Memulai Auto-Push {taps_to_do} Taps...", "INFO")
         total_pushed = 0
         batch_size = 50
 
@@ -172,25 +224,25 @@ class NineChainBot:
                     self.stats["xp_total"] = str(state.get("xpTotal", self.stats["xp_total"]))
                     remaining = state.get("tapsRemaining", 0)
 
-                    print(f"[{self.name}] [+] PUSH +{count} Taps Sukses! ({total_pushed}/{taps_to_do} | Sisa Kuota: {remaining})")
+                    self.log(f"PUSH +{count} Taps Sukses ({total_pushed}/{taps_to_do} | Sisa: {remaining})", "SUCCESS")
                     if remaining == 0:
                         break
 
                     time.sleep(random.uniform(0.3, 0.6))
                 else:
                     err = res.json().get("error", {}).get("message", f"HTTP {res.status_code}")
-                    print(f"[{self.name}] - PUSH Terhenti: {err}")
+                    self.log(f"PUSH Terhenti: {err}", "WARN")
                     break
             except Exception as e:
-                print(f"[{self.name}] - Error saat PUSH: {e}")
+                self.log(f"Error saat PUSH: {e}", "WARN")
                 break
 
         self.stats["taps_done"] = total_pushed
-        print(f"[{self.name}] ✓ Selesai PUSH! Total {total_pushed} Taps berhasil ditambahkan.")
+        self.log(f"Selesai PUSH! Total +{total_pushed} Taps berhasil ditambahkan.", "SUCCESS")
 
     def auto_upgrade(self):
-        """Mengecek katalog dan melakukan upgrade hardware komponen yang terjangkau."""
-        print(f"[{self.name}] 🛠️ Mengecek kemungkinan Upgrade Hardware...")
+        """Mengecek katalog hardware dan otomatis menaikkan level modul yang terjangkau."""
+        self.log("Memeriksa kemungkinan Upgrade Hardware...", "INFO")
         try:
             res = self.session.get(f"{API_BASE}/program/catalog", timeout=15)
             if res.status_code != 200:
@@ -206,26 +258,26 @@ class NineChainBot:
                     next_lvl = comp.get("level", 0) + 1
 
                     if current_xp >= cost:
-                        print(f"[{self.name}] ⬆️ Poin cukup ({current_xp:.1f} >= {cost:.1f}). Mengupgrade {key.upper()} ke Lv.{next_lvl}...")
+                        self.log(f"Poin cukup ({current_xp:.1f} >= {cost:.1f}). Mengupgrade {key.upper()} ke Lv.{next_lvl}...", "INFO")
                         up_res = self.session.post(f"{API_BASE}/program/upgrade", json={
                             "componentKey": key,
                             "toLevel": next_lvl
                         }, timeout=15)
 
                         if up_res.status_code in [200, 201]:
-                            print(f"[{self.name}] ✓ Upgrade {key.upper()} Lv.{next_lvl} Berhasil!")
+                            self.log(f"Upgrade {key.upper()} Lv.{next_lvl} Berhasil!", "SUCCESS")
                             self.stats["upgrades"].append(f"{key.upper()} Lv.{next_lvl}")
                             current_xp -= cost
                             self.stats["xp_total"] = str(current_xp)
                         else:
                             err = up_res.json().get("error", {}).get("message", "")
-                            print(f"[{self.name}] - Upgrade {key.upper()} gagal: {err}")
+                            self.log(f"Upgrade {key.upper()} gagal: {err}", "WARN")
         except Exception as e:
-            print(f"[{self.name}] - Error saat cek upgrade: {e}")
+            self.log(f"Error saat cek upgrade: {e}", "WARN")
 
     def claim_quests(self):
-        """Mengecek quest yang sudah selesai dan mengklaim hadiahnya."""
-        print(f"[{self.name}] 📋 Memeriksa Quests harian...")
+        """Mengecek misi harian dan otomatis mengklaim reward."""
+        self.log("Memeriksa Quests harian...", "INFO")
         try:
             res = self.session.get(f"{API_BASE}/program/quests", timeout=15)
             if res.status_code != 200:
@@ -242,17 +294,18 @@ class NineChainBot:
                 if is_completed and not is_claimed and quest_key:
                     c_res = self.session.post(f"{API_BASE}/program/quests/claim", json={"questKey": quest_key}, timeout=15)
                     if c_res.status_code in [200, 201]:
-                        print(f"[{self.name}] ✓ Klaim Quest '{quest_key}' Berhasil!")
+                        self.log(f"Klaim Quest '{quest_key}' Berhasil!", "SUCCESS")
                         claimed_count += 1
             
             self.stats["quests_claimed"] = claimed_count
             if claimed_count > 0:
-                print(f"[{self.name}] ✓ Total {claimed_count} quest berhasil diklaim.")
+                self.log(f"Total {claimed_count} quest berhasil diklaim.", "SUCCESS")
         except Exception as e:
-            print(f"[{self.name}] - Error cek quest: {e}")
+            self.log(f"Error cek quest: {e}", "WARN")
 
 
 def send_telegram_notification(tg_config, all_stats):
+    """Mengirim ringkasan laporan ke Telegram."""
     if not tg_config.get("enabled"):
         return
 
@@ -261,8 +314,8 @@ def send_telegram_notification(tg_config, all_stats):
     if not bot_token or not chat_id or "YOUR_" in bot_token:
         return
 
-    text = "📊 <b>Laporan Harian 9Chain Bot</b>\n"
-    text += f"⏰ Waktu: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+    text = "📊 <b>Laporan 9Chain Bot (24/7)</b>\n"
+    text += f"⏰ Waktu: <code>{time.strftime('%Y-%m-%d %H:%M:%S')}</code>\n"
     text += "────────────────────────\n"
 
     for s in all_stats:
@@ -280,37 +333,40 @@ def send_telegram_notification(tg_config, all_stats):
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     try:
         requests.post(url, json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"}, timeout=15)
-        print("\n[✓] Notifikasi ringkasan terkirim ke Telegram!")
+        print(f"\n{GREEN}[✓] Notifikasi ringkasan terkirim ke Telegram!{RESET}")
     except Exception as e:
-        print(f"\n[!] Gagal mengirim notifikasi Telegram: {e}")
+        print(f"\n{RED}[!] Gagal mengirim notifikasi Telegram: {e}{RESET}")
 
 
 def sleep_with_countdown(seconds):
-    """Menampilkan countdown timer yang rapi sebelum siklus berikutnya."""
+    """Menampilkan hitung mundur waktu tunggu sebelum siklus berikutnya."""
     while seconds > 0:
         hrs = seconds // 3600
         mins = (seconds % 3600) // 60
         secs = seconds % 60
-        print(f"\r⏳ Menunggu siklus berikutnya: {hrs:02d}:{mins:02d}:{secs:02d} ...", end="", flush=True)
+        sys.stdout.write(f"\r⏳ {YELLOW}Menunggu siklus berikutnya: {BOLD}{hrs:02d}:{mins:02d}:{secs:02d}{RESET} ...")
+        sys.stdout.flush()
         time.sleep(1)
         seconds -= 1
-    print("\r" + " " * 60 + "\r", end="", flush=True)
+    sys.stdout.write("\r" + " " * 70 + "\r")
+    sys.stdout.flush()
 
 
 def run_all_accounts(config):
+    """Menjalankan otomasi untuk seluruh akun terdaftar."""
     settings = config.get("settings", {})
     accounts = config.get("accounts", [])
     tg_config = config.get("telegram", {})
 
-    print("=" * 60)
-    print(f"🚀 9Chain All-in-One Bot | Total: {len(accounts)} Akun")
-    print(f"⏰ Waktu Eksekusi: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 60)
+    print(f"\n{BOLD}{'═' * 60}{RESET}")
+    print(f"🚀 {BOLD}Eksekusi Bot | Total: {len(accounts)} Akun | Waktu: {time.strftime('%Y-%m-%d %H:%M:%S')}{RESET}")
+    print(f"{BOLD}{'═' * 60}{RESET}")
 
     summary_stats = []
 
     for idx, acc in enumerate(accounts, start=1):
-        print(f"\n▶ [{idx}/{len(accounts)}] Memproses: {acc.get('name')}")
+        name = acc.get('name', f'Akun {idx}')
+        print(f"\n{CYAN}{BOLD}▶ [{idx}/{len(accounts)}] Memproses: {name}{RESET}")
         bot = NineChainBot(acc)
 
         # Login jika token belum tersedia
@@ -349,18 +405,19 @@ def run_all_accounts(config):
         # Jeda natural antar akun
         if idx < len(accounts):
             pause = random.randint(2, 5)
-            print(f"[*] Menunggu {pause} detik sebelum akun berikutnya...")
+            print(f"{DIM}[*] Menunggu {pause} detik sebelum akun berikutnya...{RESET}")
             time.sleep(pause)
 
     # Kirim Laporan Telegram
     send_telegram_notification(tg_config, summary_stats)
 
-    print("\n" + "=" * 60)
-    print("🎉 SEMUA AKUN SELESAI DIPROSES PADA SIKLUS INI!")
-    print("=" * 60)
+    print(f"\n{BOLD}{'═' * 60}{RESET}")
+    print(f"{GREEN}🎉 SEMUA AKUN SELESAI DIPROSES PADA SIKLUS INI!{RESET}")
+    print(f"{BOLD}{'═' * 60}{RESET}")
 
 
 def main():
+    print(BANNER)
     config_path = os.path.join(os.path.dirname(__file__), "accounts.json")
     example_path = os.path.join(os.path.dirname(__file__), "accounts.example.json")
 
@@ -368,21 +425,22 @@ def main():
         if os.path.exists(example_path):
             import shutil
             shutil.copy(example_path, config_path)
-            print(f"[!] File accounts.json otomatis dibuat dari accounts.example.json.")
-            print(f"[*] Silakan edit file accounts.json dan masukkan akun Anda:")
-            print("    nano accounts.json")
+            print(f"{YELLOW}[!] File accounts.json otomatis dibuat dari accounts.example.json.{RESET}")
+            print(f"[*] Silakan isi akun Anda di file accounts.json:")
+            print(f"    {BOLD}nano accounts.json{RESET}\n")
         else:
-            print(f"✗ File {config_path} tidak ditemukan!")
+            print(f"{RED}✗ File {config_path} tidak ditemukan!{RESET}")
         return
 
+    cycle_count = 1
     try:
         while True:
-            # Reload config tiap siklus agar perubahan setting/akun langsung terbaca
+            # Reload config tiap siklus agar perubahan akun langsung terbaca tanpa restart bot
             try:
                 with open(config_path, "r", encoding="utf-8") as f:
                     config = json.load(f)
             except Exception as e:
-                print(f"✗ Gagal membaca accounts.json: {e}")
+                print(f"{RED}✗ Gagal membaca accounts.json: {e}{RESET}")
                 time.sleep(10)
                 continue
 
@@ -390,18 +448,20 @@ def main():
             loop_mode = settings.get("loop_mode", True)
             loop_hours = settings.get("loop_interval_hours", 6)
 
+            print(f"{MAGENTA}{BOLD}[Siklus #{cycle_count}]{RESET}")
             run_all_accounts(config)
+            cycle_count += 1
 
             if not loop_mode:
-                print("\n[ℹ️] Loop mode nonaktif (loop_mode: false). Bot berhenti.")
+                print(f"\n{CYAN}[ℹ️] Mode loop nonaktif (loop_mode: false). Selesai.{RESET}")
                 break
 
             interval_seconds = int(loop_hours * 3600)
-            print(f"\n💤 Mode 24/7 Aktif. Bot akan tidur selama {loop_hours} jam.")
+            print(f"\n💤 Mode 24/7 Aktif. Siklus berikutnya dalam {BOLD}{loop_hours} jam{RESET}.")
             sleep_with_countdown(interval_seconds)
-            print("\n🔄 Memulai siklus baru...")
+            print(f"\n🔄 {CYAN}Memulai siklus baru...{RESET}")
     except KeyboardInterrupt:
-        print("\n\n🛑 Bot dihentikan oleh pengguna (Ctrl+C). Sampai jumpa!")
+        print(f"\n\n{YELLOW}🛑 Bot dihentikan oleh pengguna (Ctrl+C). Sampai jumpa!{RESET}\n")
 
 if __name__ == "__main__":
     main()
