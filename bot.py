@@ -199,8 +199,8 @@ class NineChainBot:
             self.log(f"Error koneksi state: {e}", "ERROR")
             return None
 
-    def push_taps(self, max_taps=1000):
-        """Melakukan auto-tap / PUSH hingga kuota hari ini habis."""
+    def push_taps(self, max_taps=1000, batch_size=5, delay_min=1.0, delay_max=2.5):
+        """Melakukan auto-tap / PUSH secara bertahap, santai, dan menyerupai manusia."""
         taps_to_do = self.stats["taps_remaining"]
         if max_taps:
             taps_to_do = min(taps_to_do, max_taps)
@@ -209,12 +209,17 @@ class NineChainBot:
             self.log("Kuota PUSH tap harian sudah habis (0 remaining).", "INFO")
             return
 
-        self.log(f"Memulai Auto-Push {taps_to_do} Taps...", "INFO")
+        self.log(f"Memulai PUSH Santai ({taps_to_do} Taps, ~{batch_size} taps/request, jeda {delay_min}-{delay_max}s)...", "INFO")
         total_pushed = 0
-        batch_size = 50
 
         while total_pushed < taps_to_do:
-            count = min(batch_size, taps_to_do - total_pushed)
+            # Variasi batch size sedikit agar terlihat natural
+            if batch_size > 3:
+                current_batch = random.randint(max(1, batch_size - 2), batch_size + 2)
+            else:
+                current_batch = batch_size
+
+            count = min(current_batch, taps_to_do - total_pushed)
             try:
                 res = self.session.post(f"{API_BASE}/program/tap", json={"count": count}, timeout=15)
                 if res.status_code in [200, 201]:
@@ -224,11 +229,13 @@ class NineChainBot:
                     self.stats["xp_total"] = str(state.get("xpTotal", self.stats["xp_total"]))
                     remaining = state.get("tapsRemaining", 0)
 
-                    self.log(f"PUSH +{count} Taps Sukses ({total_pushed}/{taps_to_do} | Sisa: {remaining})", "SUCCESS")
+                    self.log(f"PUSH +{count} Taps ({total_pushed}/{taps_to_do} | Sisa Kuota: {remaining})", "SUCCESS")
                     if remaining == 0:
                         break
 
-                    time.sleep(random.uniform(0.3, 0.6))
+                    # Jeda santai antar tap
+                    sleep_time = random.uniform(delay_min, delay_max)
+                    time.sleep(sleep_time)
                 else:
                     err = res.json().get("error", {}).get("message", f"HTTP {res.status_code}")
                     self.log(f"PUSH Terhenti: {err}", "WARN")
@@ -387,7 +394,15 @@ def run_all_accounts(config):
         if state:
             # 3. Auto Push Taps
             if settings.get("auto_push_taps", True):
-                bot.push_taps(max_taps=settings.get("max_taps", 1000))
+                batch_size = int(settings.get("tap_batch_size", 5))
+                delay_min = float(settings.get("tap_delay_min", 1.0))
+                delay_max = float(settings.get("tap_delay_max", 2.5))
+                bot.push_taps(
+                    max_taps=settings.get("max_taps", 1000),
+                    batch_size=batch_size,
+                    delay_min=delay_min,
+                    delay_max=delay_max
+                )
 
             # 4. Auto Upgrade Komponen Node
             if settings.get("auto_upgrade_node", True):

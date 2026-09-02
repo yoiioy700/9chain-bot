@@ -99,6 +99,8 @@ nano accounts.json
 * **`loop_mode`**: `true` agar bot berjalan terus 24/7. Set ke `false` jika ingin bot berjalan sekali saja lalu selesai.
 * **`loop_interval_hours`**: Waktu tunggu (dalam jam) sebelum siklus berikutnya dijalankan (rekomendasi: `6`).
 * **`max_taps`**: Maksimal kuota tap harian yang diproses (default: `1000`).
+* **`tap_batch_size`**: Jumlah tap per request (default: `5` tap, bisa diatur `1` sampai `50`).
+* **`tap_delay_min` & `tap_delay_max`**: Rentang jeda santai antar tap dalam detik (default: `1.0` - `2.5` detik).
 
 ---
 

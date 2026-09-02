@@ -10,6 +10,9 @@
     "auto_daily_gift": true,
     "auto_push_taps": true,
     "max_taps": 1000,
+    "tap_batch_size": 5,
+    "tap_delay_min": 1.0,
+    "tap_delay_max": 2.5,
     "auto_upgrade_node": true,
     "auto_claim_quests": true
   },
