@@ -4,33 +4,56 @@ Bot automasi terminal super ringan untuk platform **9Chain** (https://www.9chain
 Didesain khusus untuk VPS Headless low-spec (tidak butuh Chromium / browser GUI, hanya butuh RAM ~15 MB).
 
 ## Fitur Utama
-1. **Auto Push Taps**: Eksekusi 1.000 tap harian otomatis dengan batch request efisien dan jeda natural.
-2. **Auto Daily Quests & Gifts**: Klaim quest dan hadiah harian otomatis.
-3. **Auto Hardware Upgrade**: Otomatis menaikkan level CPU & RAM jika poin mencukupi.
-4. **Auto Pray Message**: Otomatis mengirim pesan doa komunitas.
-5. **Multi-Account & Proxy Support**: Menjalankan banyak akun secara berurutan dengan sesi terisolasi dan dukungan proxy.
-6. **Telegram Notification**: Mengirim laporan ringkasan eksekusi harian ke bot Telegram Anda.
+1. **Auto Login / Token Support**: Mendukung login otomatis menggunakan **Email & Password** maupun langsung via **Access Token (JWT)**.
+2. **Auto Daily Gift / Streak**: Otomatis mengklaim hadiah check-in harian (`/me/check-in`).
+3. **Auto Push Taps**: Eksekusi 1.000 tap harian otomatis dengan batch request efisien dan jeda natural.
+4. **Auto Hardware Upgrade**: Otomatis menaikkan level modul hardware (CPU, RAM, Anti-Sybil) jika poin LOVE9 mencukupi.
+5. **Auto Claim Quests**: Otomatis memeriksa dan mengklaim reward misi harian yang sudah selesai.
+6. **Multi-Account & Proxy Support**: Menjalankan banyak akun secara berurutan dengan sesi terisolasi dan dukungan proxy HTTP/HTTPS.
+7. **Telegram Notification**: Mengirim laporan ringkasan eksekusi harian ke bot Telegram Anda.
 
 ---
 
-## Cara Mengambil Token Akun (Hanya 5 Detik)
+## Cara Konfigurasi Akun (`accounts.json`)
 
-1. Buka https://www.9chain.com di browser PC / HP Anda dan pastikan sudah login.
+Anda bisa menggunakan **Opsi A (Email & Password)** atau **Opsi B (Access Token)**:
+
+### Opsi A: Login Menggunakan Email & Password (Paling Praktis)
+Cukup masukkan email dan password akun 9Chain Anda di `accounts.json`:
+```json
+{
+  "name": "Akun Utama",
+  "email": "email_anda@gmail.com",
+  "password": "password_akun_anda",
+  "totp_code": "",
+  "proxy": ""
+}
+```
+
+### Opsi B: Menggunakan Access Token (Jika menggunakan 2FA atau Wallet)
+1. Buka https://www.9chain.com di browser PC / HP dan login ke akun Anda.
 2. Buka **Developer Tools** (Tekan `F12` di keyboard) lalu pilih tab **Console**.
 3. Ketik perintah berikut lalu tekan **Enter**:
    ```javascript
    JSON.parse(localStorage.getItem('9chain-auth')).state.accessToken
    ```
-4. Salin teks token yang muncul (berupa string panjang JWT).
+4. Salin string token dan tempelkan ke `accounts.json`:
+```json
+{
+  "name": "Akun Utama",
+  "token": "eyJhbGciOiJIUzI1NiIsIn...",
+  "proxy": ""
+}
+```
 
 ---
 
-## Cara Instalasi & Penggunaan di VPS
+## Cara Instalasi & Penggunaan di VPS / Terminal
 
-### 1. Masuk ke Direktori Proyek
+### 1. Clone / Masuk ke Direktori Proyek
 ```bash
+git clone https://github.com/yoiioy700/9chain-bot.git
 cd 9chain-bot
-git pull origin main
 ```
 
 ### 2. Install Dependensi
@@ -38,39 +61,14 @@ git pull origin main
 pip install -r requirements.txt
 ```
 
-### 3. Konfigurasi Akun (`accounts.json`)
-Salin template konfigurasi:
+### 3. Konfigurasi `accounts.json`
+Salin template:
 ```bash
 cp accounts.example.json accounts.json
 ```
-Lalu edit file `accounts.json` dan tempelkan token akun Anda:
+Edit file:
 ```bash
 nano accounts.json
-```
-
-Contoh isi `accounts.json`:
-```json
-{
-  "telegram": {
-    "enabled": false,
-    "bot_token": "YOUR_TELEGRAM_BOT_TOKEN",
-    "chat_id": "YOUR_TELEGRAM_CHAT_ID"
-  },
-  "settings": {
-    "auto_daily_gift": true,
-    "auto_push_taps": true,
-    "max_taps": 1000,
-    "auto_upgrade_node": true,
-    "auto_pray": true
-  },
-  "accounts": [
-    {
-      "name": "Akun Utama",
-      "token": "eyJhbGciOiJIUzI1NiIsIn...",
-      "proxy": ""
-    }
-  ]
-}
 ```
 
 ### 4. Jalankan Bot
@@ -79,12 +77,14 @@ python bot.py
 ```
 *(atau `python3 bot.py` di VPS)*
 
-### 5. Jadwalkan Otomatis (Cron Job VPS)
-Buka crontab:
+---
+
+## Jadwalkan Otomatis (Cron Job VPS)
+Agar bot berjalan otomatis setiap hari pada jam 06:00 WIB:
 ```bash
 crontab -e
 ```
-Tambahkan baris berikut agar bot berjalan otomatis setiap hari jam 06:00 WIB:
+Tambahkan baris:
 ```bash
 0 6 * * * /usr/bin/python3 /path/to/9chain-bot/bot.py >> /path/to/9chain-bot/bot.log 2>&1
 ```

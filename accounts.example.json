@@ -9,12 +9,19 @@
     "auto_push_taps": true,
     "max_taps": 1000,
     "auto_upgrade_node": true,
-    "auto_pray": true
+    "auto_claim_quests": true
   },
   "accounts": [
     {
-      "name": "Akun Utama",
+      "name": "Akun 1 (Login via Token)",
       "token": "PASTE_ACCESS_TOKEN_ANDA_DI_SINI",
+      "proxy": ""
+    },
+    {
+      "name": "Akun 2 (Login via Email & Password)",
+      "email": "user@example.com",
+      "password": "password_anda",
+      "totp_code": "",
       "proxy": ""
     }
   ]
