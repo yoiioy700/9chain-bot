@@ -17,7 +17,15 @@
     "auto_upgrade_node_tier": true,
     "auto_claim_quests": true,
     "auto_pray": true,
-    "pray_room": "together"
+    "pray_room": "together",
+    "prayer_messages": [
+      "Semoga ekosistem 9Chain semakin sukses, berkah, dan maju untuk semua.",
+      "Wishing health, happiness, and peace for everyone in 9Chain community.",
+      "May this project bring good fortune and growth to all nodes.",
+      "Semoga hari ini penuh berkah dan kelancaran untuk kita semua.",
+      "Peace, prosperity, and blessings to the global 9Chain family.",
+      "Keep building, keep growing, wishing success for 9Chain testnet and mainnet."
+    ]
   },
   "accounts": [
     {

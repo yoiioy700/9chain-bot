@@ -615,7 +615,9 @@ def run_all_accounts(config):
             # 7. Auto Chat Pray Together (Doa Harian Komunitas)
             if settings.get("auto_pray", True):
                 room_slug = settings.get("pray_room", "together")
-                bot.send_prayer(room_slug=room_slug)
+                custom_msgs = settings.get("prayer_messages", [])
+                chosen_msg = random.choice(custom_msgs) if custom_msgs else None
+                bot.send_prayer(room_slug=room_slug, custom_text=chosen_msg)
 
             # Ambil state terakhir setelah semua aksi
             bot.fetch_state()
